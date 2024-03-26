@@ -10,6 +10,9 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
@@ -82,11 +85,12 @@ public class GattClientService extends Service {
         scanning = false;
         if(mBound && mBluetoothAdapter != null && mBluetoothAdapter.isEnabled())//if enabled
         {
+            final BluetoothLeScanner bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
             if (enable) {
-                mBluetoothAdapter.startLeScan(mLeScanCallback);
+                bluetoothLeScanner.startScan(mLeScanCallback);
                 scanning = true;
             } else {
-                mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                bluetoothLeScanner.stopScan(mLeScanCallback);
             }
         }
         return scanning;
@@ -143,16 +147,29 @@ public class GattClientService extends Service {
     }
     // Device scan callback.
 
-    private BluetoothAdapter.LeScanCallback mLeScanCallback =
-            new BluetoothAdapter.LeScanCallback() {
+    private ScanCallback mLeScanCallback =
+            new ScanCallback() {
+
                 @Override
-                public void onLeScan(final BluetoothDevice device, int rssi,
-                                     byte[] scanRecord) {
-                    if(availableDevices.get(device.getAddress()) == null)
-                    {
+                public void onScanResult(int callbackType, ScanResult result) {
+                    super.onScanResult(callbackType, result);
+                    BluetoothDevice device = result.getDevice();
+                    if(availableDevices.get(device.getAddress()) == null) {
                         availableDevices.put(device.getAddress(), device);
                         mInterface.onGattDeviceFound(device, device.getAddress());
                     }
+                }
+
+                @Override
+                public void onBatchScanResults(List<ScanResult> results) {
+                    super.onBatchScanResults(results);
+                    Log.i("aa","bb");
+                }
+
+                @Override
+                public void onScanFailed(int errorCode) {
+                    super.onScanFailed(errorCode);
+                    Log.i("aa","cc");
                 }
             };
 
@@ -193,6 +210,7 @@ public class GattClientService extends Service {
         // Result of a characteristic read operation
         public void onCharacteristicRead(BluetoothGatt gatt,
                                          BluetoothGattCharacteristic characteristic,
+                                         byte[] value,
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i("GattClientService:", "Read GattCharacteristic:" + characteristic);
@@ -211,7 +229,7 @@ public class GattClientService extends Service {
         }
         @Override
         public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
-                                     int status) {
+                                     int status, byte[] value) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i("GattClientService:", "Wrote GattDescriptor" + descriptor);
             }else{
